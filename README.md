@@ -21,8 +21,8 @@ Written in Go, single binary, no external dependencies on the PBX host.
 | `asterisk_sip_peer_up` | gauge | `peer`, `status` | chan_sip peer reachability (1=OK) |
 | `asterisk_sip_peer_latency_milliseconds` | gauge | `peer` | chan_sip qualify RTT |
 | `asterisk_sip_peers` | gauge | `status` | chan_sip peers grouped by status |
-| `asterisk_pjsip_endpoint_up` | gauge | `endpoint`, `device_state` | PJSIP endpoint reachability |
-| `asterisk_pjsip_endpoints` | gauge | `device_state` | PJSIP endpoints grouped by device state |
+| `asterisk_pjsip_endpoint_up` | gauge | `endpoint`, `device_state`, `kind` | PJSIP endpoint reachability; `kind` is heuristic `trunk`/`extension` |
+| `asterisk_pjsip_endpoints` | gauge | `device_state`, `kind` | PJSIP endpoints grouped by device state and kind |
 | `asterisk_queue_callers` | gauge | `queue` | Callers waiting in queue |
 | `asterisk_queue_completed_calls` | counter | `queue` | Calls completed by queue (since startup) |
 | `asterisk_queue_abandoned_calls` | counter | `queue` | Calls abandoned in queue (since startup) |
@@ -72,6 +72,22 @@ The exporter uses these AMI actions: `Login`, `Logoff`, `CoreSettings`,
 `CoreStatus`, `CoreShowChannels`, `SIPpeers`, `PJSIPShowEndpoints`,
 `QueueStatus`. Optional modules return `Invalid/unknown command` if not
 loaded; that's handled gracefully.
+
+### PJSIP `kind` label (trunk vs extension)
+
+PJSIP itself has no native `trunk`/`extension` distinction — both are
+`[endpoint]` blocks. AMI doesn't expose a flag either, so the exporter
+classifies each endpoint heuristically using the `OutboundAuths`/`Auths`
+fields plus a name fallback that matches FreePBX conventions:
+
+1. `OutboundAuths` set → `trunk` (authenticates outbound to a provider).
+2. `Auths` set, no outbound → `extension` (accepts inbound auth).
+3. Neither side has auth → `trunk` if the endpoint name is non-numeric
+   (FreePBX trunks are typically named, e.g. `ITD`, `Kamailio`); otherwise
+   `extension`.
+
+Stock FreePBX setups classify cleanly. If you build endpoints by hand in
+`pjsip.conf` with unusual auth shapes, expect occasional misclassification.
 
 ## Running
 

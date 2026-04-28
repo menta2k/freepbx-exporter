@@ -138,13 +138,13 @@ func New(cfg ami.Config, opts ScrapeOptions, logger *slog.Logger, dialer ami.Dia
 
 		pjsipEndpointUp: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "pjsip", "endpoint_up"),
-			"PJSIP endpoint availability (1 if device_state is 'Not in use'/'In use'/'Busy'/'Ringing', 0 otherwise).",
-			labels("endpoint", "device_state"), nil,
+			"PJSIP endpoint availability (1 if device_state is 'Not in use'/'In use'/'Busy'/'Ringing', 0 otherwise). 'kind' is heuristically 'trunk' or 'extension'.",
+			labels("endpoint", "device_state", "kind"), nil,
 		),
 		pjsipEndpointCount: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "pjsip", "endpoints"),
-			"PJSIP endpoints grouped by device_state.",
-			labels("device_state"), nil,
+			"PJSIP endpoints grouped by device_state and heuristic kind (trunk/extension).",
+			labels("device_state", "kind"), nil,
 		),
 
 		queueCallers: prometheus.NewDesc(

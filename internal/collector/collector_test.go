@@ -84,8 +84,20 @@ func TestCollectorHappyPath(t *testing.T) {
 				ami.NewMessage("Event", "PeerEntry", "ObjectName", "102", "Status", "LAGGED (250 ms)"),
 			},
 			"PJSIPShowEndpoints": {
-				ami.NewMessage("Event", "EndpointList", "ObjectName", "200", "DeviceState", "Not in use"),
-				ami.NewMessage("Event", "EndpointList", "ObjectName", "201", "DeviceState", "Unavailable"),
+				// Numeric name + inbound Auths -> extension.
+				ami.NewMessage("Event", "EndpointList",
+					"ObjectName", "200", "DeviceState", "Not in use",
+					"Auths", "auth200"),
+				ami.NewMessage("Event", "EndpointList",
+					"ObjectName", "201", "DeviceState", "Unavailable",
+					"Auths", "auth201"),
+				// OutboundAuths -> trunk.
+				ami.NewMessage("Event", "EndpointList",
+					"ObjectName", "ITD", "DeviceState", "Not in use",
+					"OutboundAuths", "itd-outbound"),
+				// No auths, non-numeric name -> trunk by naming heuristic.
+				ami.NewMessage("Event", "EndpointList",
+					"ObjectName", "Kamailio", "DeviceState", "Not in use"),
 				ami.NewMessage("Event", "ContactStatusDetail", "ObjectName", "ignored"), // must be skipped
 			},
 			"QueueStatus": {
@@ -135,8 +147,10 @@ asterisk_info{system_name="pbx-1",version="18.20.0"} 1
 		`asterisk_sip_peer_up{peer="101",status="UNREACHABLE"} 0`,
 		`asterisk_sip_peer_latency_milliseconds{peer="100"} 12`,
 		`asterisk_sip_peer_latency_milliseconds{peer="102"} 250`,
-		`asterisk_pjsip_endpoint_up{device_state="Not in use",endpoint="200"} 1`,
-		`asterisk_pjsip_endpoint_up{device_state="Unavailable",endpoint="201"} 0`,
+		`asterisk_pjsip_endpoint_up{device_state="Not in use",endpoint="200",kind="extension"} 1`,
+		`asterisk_pjsip_endpoint_up{device_state="Unavailable",endpoint="201",kind="extension"} 0`,
+		`asterisk_pjsip_endpoint_up{device_state="Not in use",endpoint="ITD",kind="trunk"} 1`,
+		`asterisk_pjsip_endpoint_up{device_state="Not in use",endpoint="Kamailio",kind="trunk"} 1`,
 		`asterisk_queue_callers{queue="support"} 2`,
 		`asterisk_queue_completed_calls{queue="support"} 100`,
 		`asterisk_queue_abandoned_calls{queue="support"} 5`,
