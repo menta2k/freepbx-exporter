@@ -97,9 +97,11 @@ Visit http://localhost:9810/metrics.
 
 ### systemd
 
-The shipped Debian package installs `/lib/systemd/system/freepbx-exporter.service`
-and reads from `/etc/default/freepbx-exporter`. Edit that file with your AMI
-credentials and `systemctl restart freepbx-exporter`.
+The shipped Debian (`.deb`) and RPM (`.rpm`) packages install
+`/lib/systemd/system/freepbx-exporter.service` and read from
+`/etc/default/freepbx-exporter`. Edit that file with your AMI credentials and
+`systemctl restart freepbx-exporter`. Both package flavours are produced for
+`amd64`/`x86_64` and `arm64`/`aarch64` and attached to each GitHub Release.
 
 ## Development
 

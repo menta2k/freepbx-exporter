@@ -79,22 +79,36 @@ jobs:
         run: |
           curl -sSL "https://github.com/goreleaser/nfpm/releases/download/v2.38.0/nfpm_2.38.0_Linux_x86_64.tar.gz" \
             | tar -xz -C /usr/local/bin nfpm
-      - name: Build .deb
+      - name: Build packages
         env:
           VERSION: ${{ github.ref_name }}
           PKG_ARCH: ${{ matrix.pkgarch }}
         run: |
           mkdir -p dist
-          # Strip leading 'v' from tag so debs follow x.y.z convention.
+          # Strip leading 'v' from tag so package versions follow x.y.z.
           VERSION="${VERSION#v}"
           export VERSION
+
+          # Map our pkgarch to RPM's arch naming convention.
+          case "$PKG_ARCH" in
+            amd64) RPM_ARCH=x86_64 ;;
+            arm64) RPM_ARCH=aarch64 ;;
+            *)     RPM_ARCH="$PKG_ARCH" ;;
+          esac
+
           nfpm pkg --packager deb \
             --target "dist/freepbx-exporter_${VERSION}_${PKG_ARCH}.deb" \
             -f nfpm.yaml
+
+          nfpm pkg --packager rpm \
+            --target "dist/freepbx-exporter-${VERSION}-1.${RPM_ARCH}.rpm" \
+            -f nfpm.yaml
       - uses: actions/upload-artifact@v4
         with:
-          name: deb-${{ matrix.pkgarch }}
-          path: dist/*.deb
+          name: pkg-${{ matrix.pkgarch }}
+          path: |
+            dist/*.deb
+            dist/*.rpm
 
   release:
     needs: package
@@ -112,6 +126,8 @@ jobs:
           files: |
             artifacts/freepbx-exporter-linux-amd64/freepbx-exporter-linux-amd64
             artifacts/freepbx-exporter-linux-arm64/freepbx-exporter-linux-arm64
-            artifacts/deb-amd64/*.deb
-            artifacts/deb-arm64/*.deb
+            artifacts/pkg-amd64/*.deb
+            artifacts/pkg-amd64/*.rpm
+            artifacts/pkg-arm64/*.deb
+            artifacts/pkg-arm64/*.rpm
           generate_release_notes: true
