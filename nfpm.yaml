@@ -1,0 +1,32 @@
+name: freepbx-exporter
+arch: amd64
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+maintainer: Veselin Iordanov <veselin.iordanov@gmail.com>
+description: |
+  Prometheus exporter for FreePBX/Asterisk via the Asterisk Manager Interface.
+homepage: https://github.com/menta2k/freepbx-exporter
+license: MIT
+
+contents:
+  - src: ./freepbx-exporter
+    dst: /usr/bin/freepbx-exporter
+    file_info:
+      mode: 0755
+
+  - src: ./deploy/freepbx-exporter.service
+    dst: /lib/systemd/system/freepbx-exporter.service
+    file_info:
+      mode: 0644
+
+  - src: ./deploy/freepbx-exporter.default
+    dst: /etc/default/freepbx-exporter
+    type: config|noreplace
+    file_info:
+      mode: 0640
+
+scripts:
+  postinstall: ./deploy/scripts/postinstall.sh
+  preremove: ./deploy/scripts/preremove.sh

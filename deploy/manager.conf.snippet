@@ -1,0 +1,13 @@
+; /etc/asterisk/manager.conf -- snippet to grant the exporter read-only AMI
+; access. Reload AMI with `asterisk -rx "manager reload"` or restart Asterisk.
+;
+; Permissions are intentionally minimal: read-only system+call+reporting are
+; sufficient for the actions used by the exporter (CoreStatus, CoreSettings,
+; CoreShowChannels, SIPpeers, PJSIPShowEndpoints, QueueStatus).
+
+[prometheus]
+secret = CHANGE_ME
+deny   = 0.0.0.0/0.0.0.0
+permit = 127.0.0.1/255.255.255.255
+read   = system,call,reporting
+write  =

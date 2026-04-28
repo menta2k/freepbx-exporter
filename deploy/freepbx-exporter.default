@@ -1,0 +1,21 @@
+# /etc/default/freepbx-exporter
+# Environment file for the freepbx-exporter systemd service.
+
+# Where to listen for Prometheus scrapes.
+FREEPBX_EXPORTER_LISTEN=:9810
+
+# AMI connection (configure /etc/asterisk/manager.conf to allow this user
+# from the exporter's host).
+FREEPBX_EXPORTER_AMI_ADDRESS=127.0.0.1:5038
+FREEPBX_EXPORTER_AMI_USERNAME=prometheus
+FREEPBX_EXPORTER_AMI_SECRET=changeme
+FREEPBX_EXPORTER_AMI_TIMEOUT=10s
+
+# Toggle subsystem scraping (true|false).
+#FREEPBX_EXPORTER_NO_SIP=false
+#FREEPBX_EXPORTER_NO_PJSIP=false
+#FREEPBX_EXPORTER_NO_QUEUES=false
+
+# Logging.
+FREEPBX_EXPORTER_LOG_LEVEL=info
+FREEPBX_EXPORTER_LOG_FORMAT=text

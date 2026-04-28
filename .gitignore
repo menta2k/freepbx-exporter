@@ -1,0 +1,22 @@
+# Binaries
+/freepbx-exporter
+/dist/
+/bin/
+
+# Test artifacts
+*.test
+*.out
+coverage.txt
+coverage.html
+
+# Editor
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+
+# Local config
+*.local.yaml
+.env
