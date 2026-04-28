@@ -1,5 +1,5 @@
 name: freepbx-exporter
-arch: amd64
+arch: ${PKG_ARCH}
 platform: linux
 version: ${VERSION}
 section: net
