@@ -25,20 +25,25 @@ type Config struct {
 	DisablePJSIP  bool
 	DisableQueues bool
 
+	EnableEvents   bool // run a persistent AMI event-stream consumer
+	RTCPPerChannel bool // emit per-channel packet_loss_ratio (high cardinality)
+
 	LogLevel  string // debug|info|warn|error
 	LogFormat string // text|json
 }
 
 // Defaults are applied where neither flag nor env set a value.
 var Defaults = Config{
-	ListenAddress: ":9810",
-	MetricsPath:   "/metrics",
-	AMIAddress:    "127.0.0.1:5038",
-	AMIUsername:   "",
-	AMISecret:     "",
-	AMITimeout:    10 * time.Second,
-	LogLevel:      "info",
-	LogFormat:     "text",
+	ListenAddress:  ":9810",
+	MetricsPath:    "/metrics",
+	AMIAddress:     "127.0.0.1:5038",
+	AMIUsername:    "",
+	AMISecret:      "",
+	AMITimeout:     10 * time.Second,
+	EnableEvents:   true,
+	RTCPPerChannel: false,
+	LogLevel:       "info",
+	LogFormat:      "text",
 }
 
 // Load parses argv (excluding program name) and returns a validated Config.
@@ -60,6 +65,8 @@ func Load(args []string) (Config, error) {
 	fs.BoolVar(&cfg.DisableSIP, "no-sip", cfg.DisableSIP, "Disable chan_sip peer scraping.")
 	fs.BoolVar(&cfg.DisablePJSIP, "no-pjsip", cfg.DisablePJSIP, "Disable PJSIP endpoint scraping.")
 	fs.BoolVar(&cfg.DisableQueues, "no-queues", cfg.DisableQueues, "Disable queue scraping.")
+	fs.BoolVar(&cfg.EnableEvents, "enable-events", cfg.EnableEvents, "Run a persistent AMI event-stream consumer for call-quality metrics.")
+	fs.BoolVar(&cfg.RTCPPerChannel, "rtcp-per-channel", cfg.RTCPPerChannel, "Emit per-channel asterisk_rtcp_packet_loss_ratio (high cardinality).")
 	fs.StringVar(&cfg.LogLevel, "log.level", cfg.LogLevel, "Log level (debug|info|warn|error).")
 	fs.StringVar(&cfg.LogFormat, "log.format", cfg.LogFormat, "Log format (text|json).")
 
@@ -134,6 +141,8 @@ func applyEnv(c *Config) {
 	c.DisableSIP = parseBoolEnv("FREEPBX_EXPORTER_NO_SIP", c.DisableSIP)
 	c.DisablePJSIP = parseBoolEnv("FREEPBX_EXPORTER_NO_PJSIP", c.DisablePJSIP)
 	c.DisableQueues = parseBoolEnv("FREEPBX_EXPORTER_NO_QUEUES", c.DisableQueues)
+	c.EnableEvents = parseBoolEnv("FREEPBX_EXPORTER_ENABLE_EVENTS", c.EnableEvents)
+	c.RTCPPerChannel = parseBoolEnv("FREEPBX_EXPORTER_RTCP_PER_CHANNEL", c.RTCPPerChannel)
 	if v := os.Getenv("FREEPBX_EXPORTER_LOG_LEVEL"); v != "" {
 		c.LogLevel = v
 	}

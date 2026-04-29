@@ -24,6 +24,12 @@ type Config struct {
 	Username string        // AMI manager user
 	Secret   string        // AMI manager secret
 	Timeout  time.Duration // per-action read/write timeout (0 = 10s)
+
+	// EventClasses controls the AMI "Events" header sent at Login time.
+	// Empty defaults to "off" — no async events delivered (right for the
+	// per-scrape collector). Set to e.g. "call,reporting" for an
+	// EventStream consumer.
+	EventClasses string
 }
 
 // Client is an AMI connection. It is not safe for concurrent use; create one
@@ -86,13 +92,18 @@ func (c *Client) nextActionID() string {
 }
 
 // Login authenticates with username/secret. Returns an error if AMI rejects
-// the credentials.
+// the credentials. The Events header is set from cfg.EventClasses (default
+// "off" when empty).
 func (c *Client) Login(ctx context.Context) error {
+	events := c.cfg.EventClasses
+	if events == "" {
+		events = "off"
+	}
 	resp, err := c.Action(ctx, Message{}.with(
 		"Action", "Login",
 		"Username", c.cfg.Username,
 		"Secret", c.cfg.Secret,
-		"Events", "off",
+		"Events", events,
 	))
 	if err != nil {
 		return fmt.Errorf("ami login: %w", err)
@@ -101,6 +112,20 @@ func (c *Client) Login(ctx context.Context) error {
 		return fmt.Errorf("ami login rejected: %s", resp.Get("Message"))
 	}
 	return nil
+}
+
+// NextEvent blocks until the next AMI message is available and returns it.
+// No read deadline is set, so callers must cancel ctx (which closes the
+// connection) to break out of a blocked read. Intended for long-running
+// event-stream consumers, not request/response use.
+func (c *Client) NextEvent(ctx context.Context) (Message, error) {
+	if c.conn == nil {
+		return Message{}, errors.New("ami: connection closed")
+	}
+	if err := c.conn.SetReadDeadline(time.Time{}); err != nil {
+		return Message{}, err
+	}
+	return ReadMessage(c.reader)
 }
 
 // Logoff sends an Action: Logoff. Errors are ignored by the caller in most
@@ -230,6 +255,7 @@ type Conn interface {
 	Logoff(ctx context.Context) error
 	Action(ctx context.Context, req Message) (Message, error)
 	ListAction(ctx context.Context, req Message, completeEvent string) ([]Message, error)
+	NextEvent(ctx context.Context) (Message, error)
 	Close() error
 }
 

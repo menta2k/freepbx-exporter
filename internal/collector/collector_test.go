@@ -44,6 +44,11 @@ func (f *fakeConn) ListAction(ctx context.Context, req ami.Message, _ string) ([
 	return nil, errors.New("invalid/unknown command: " + name)
 }
 
+func (f *fakeConn) NextEvent(ctx context.Context) (ami.Message, error) {
+	<-ctx.Done()
+	return ami.Message{}, ctx.Err()
+}
+
 type fakeDialer struct{ conn *fakeConn }
 
 func (d fakeDialer) Dial(ctx context.Context, _ ami.Config) (ami.Conn, error) {

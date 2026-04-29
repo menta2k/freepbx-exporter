@@ -22,6 +22,7 @@ import (
 	"github.com/menta2k/freepbx-exporter/internal/ami"
 	"github.com/menta2k/freepbx-exporter/internal/collector"
 	"github.com/menta2k/freepbx-exporter/internal/config"
+	"github.com/menta2k/freepbx-exporter/internal/rtcp"
 )
 
 func main() {
@@ -64,6 +65,36 @@ func run(args []string) error {
 	)
 	reg.MustRegister(c)
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	if cfg.EnableEvents {
+		agg := rtcp.New(rtcp.Options{PerChannel: cfg.RTCPPerChannel})
+		reg.MustRegister(agg)
+
+		stream := ami.NewEventStream(
+			ami.Config{
+				Address:      cfg.AMIAddress,
+				Username:     cfg.AMIUsername,
+				Secret:       cfg.AMISecret,
+				Timeout:      cfg.AMITimeout,
+				EventClasses: "call,reporting",
+			},
+			agg,
+			ami.EventStreamHooks{
+				OnUp:        agg.SetStreamUp,
+				OnReconnect: agg.IncReconnects,
+			},
+			logger,
+			ami.DefaultDialer{},
+		)
+		go func() {
+			if err := stream.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				logger.Error("event stream stopped", "err", err)
+			}
+		}()
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle(cfg.MetricsPath, promhttp.HandlerFor(reg, promhttp.HandlerOpts{
 		Registry:          reg,
@@ -87,9 +118,6 @@ func run(args []string) error {
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 
 	errCh := make(chan error, 1)
 	go func() {

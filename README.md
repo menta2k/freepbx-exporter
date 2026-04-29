@@ -27,6 +27,13 @@ Written in Go, single binary, no external dependencies on the PBX host.
 | `asterisk_queue_completed_calls` | counter | `queue` | Calls completed by queue (since startup) |
 | `asterisk_queue_abandoned_calls` | counter | `queue` | Calls abandoned in queue (since startup) |
 | `asterisk_queue_members` | gauge | `queue`, `status` | Queue members grouped by status |
+| `asterisk_rtcp_jitter_milliseconds` | histogram | `direction`, `channel_type` | Inter-arrival jitter from RTCP events |
+| `asterisk_rtcp_rtt_milliseconds` | histogram | `channel_type` | Round-trip time (only when AMI event includes RTT) |
+| `asterisk_rtcp_packet_loss_ratio` | gauge | `direction` (and `channel` if `--rtcp-per-channel`) | Last-seen RTCP fraction-lost (0..1) |
+| `asterisk_rtcp_events_total` | counter | `direction` | RTCP events observed on the AMI stream |
+| `asterisk_rtcp_one_way_audio_total` | counter | `reason` | Heuristic one-way audio detections at hangup |
+| `asterisk_event_stream_up` | gauge | – | 1 if persistent AMI event-stream is healthy |
+| `asterisk_event_stream_reconnects_total` | counter | – | AMI event-stream reconnect attempts |
 
 ## Configuration
 
@@ -43,6 +50,8 @@ Flags or `FREEPBX_EXPORTER_*` environment variables (flags win on conflict).
 | `-no-sip` | `FREEPBX_EXPORTER_NO_SIP` | `false` | Skip chan_sip scraping |
 | `-no-pjsip` | `FREEPBX_EXPORTER_NO_PJSIP` | `false` | Skip PJSIP scraping |
 | `-no-queues` | `FREEPBX_EXPORTER_NO_QUEUES` | `false` | Skip queue scraping |
+| `-enable-events` | `FREEPBX_EXPORTER_ENABLE_EVENTS` | `true` | Run a persistent AMI event-stream consumer for call-quality metrics |
+| `-rtcp-per-channel` | `FREEPBX_EXPORTER_RTCP_PER_CHANNEL` | `false` | Emit per-channel `asterisk_rtcp_packet_loss_ratio` (high cardinality) |
 | `-log.level` | `FREEPBX_EXPORTER_LOG_LEVEL` | `info` | debug/info/warn/error |
 | `-log.format` | `FREEPBX_EXPORTER_LOG_FORMAT` | `text` | text/json |
 
@@ -72,6 +81,38 @@ The exporter uses these AMI actions: `Login`, `Logoff`, `CoreSettings`,
 `CoreStatus`, `CoreShowChannels`, `SIPpeers`, `PJSIPShowEndpoints`,
 `QueueStatus`. Optional modules return `Invalid/unknown command` if not
 loaded; that's handled gracefully.
+
+### Call quality (RTCP) — how it works
+
+The exporter runs a **persistent AMI connection** alongside the per-scrape
+collector when `-enable-events=true` (the default). It logs in with
+`Events: call,reporting` and consumes async `RTCPSent`/`RTCPReceived`/`Hangup`
+events. Aggregated metrics are exposed at `/metrics`.
+
+| Metric | Meaning |
+|---|---|
+| `asterisk_rtcp_jitter_milliseconds` | One observation per RTCP event; field `IAJitter` (or legacy `ReportBlockIAJitter0`). Histogram buckets 1, 2.5, 5, 10, 20, 40, 80, 160, 320 ms |
+| `asterisk_rtcp_rtt_milliseconds` | Round-trip time when Asterisk reports it (PJSIP usually does, chan_sip rarely). Buckets 5, 10, 20, 40, 80, 160, 320, 640, 1280 ms |
+| `asterisk_rtcp_packet_loss_ratio` | Last-seen `FractionLost` per direction. With `-rtcp-per-channel`, also labeled by `channel` for short-lived debugging |
+| `asterisk_rtcp_events_total{direction="sent\|received"}` | Total RTCP events observed; useful as a heartbeat |
+| `asterisk_rtcp_one_way_audio_total{reason="no_inbound_rtcp\|no_outbound_rtcp"}` | Heuristic: incremented at `Hangup` if the call lasted ≥ 5 s and one direction never saw a single RTCP event. Sufficient for "calls where one side hears nothing" alerts but not a substitute for full media-flow monitoring |
+| `asterisk_event_stream_up` / `asterisk_event_stream_reconnects_total` | Health of the persistent AMI connection (auto-reconnects with 1 s → 30 s exponential backoff) |
+
+Per-channel mode (`-rtcp-per-channel=true`) produces one time-series per
+active channel and should only be turned on for short investigation windows
+on heavily-loaded PBXs — it can easily exceed 100k series otherwise.
+
+The persistent stream uses the same AMI credentials as the scrape
+connection. The required permissions (`read = system,call,reporting`) are
+already in `deploy/manager.conf.snippet`. To turn the feature off, set
+`FREEPBX_EXPORTER_ENABLE_EVENTS=false` and restart the service.
+
+Notes / limitations:
+- RTCP events on Asterisk **11** are sparser than on 16/18+. The parser
+  tolerates missing fields and only emits metrics for what's present, so
+  `rtt_milliseconds` may stay empty on very old PBXs.
+- One-way audio detection is heuristic (RTCP-flow based). For
+  ground-truth one-way detection look at media-octet counters in CDR.
 
 ### PJSIP `kind` label (trunk vs extension)
 
