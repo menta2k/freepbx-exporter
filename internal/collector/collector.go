@@ -42,6 +42,7 @@ type Collector struct {
 
 	channels        *prometheus.Desc
 	channelsByState *prometheus.Desc
+	callsActive     *prometheus.Desc
 
 	sipPeerUp        *prometheus.Desc
 	sipPeerLatencyMs *prometheus.Desc
@@ -119,6 +120,11 @@ func New(cfg ami.Config, opts ScrapeOptions, logger *slog.Logger, dialer ami.Dia
 			"Active channels grouped by ChannelStateDesc.",
 			labels("state"), nil,
 		),
+		callsActive: prometheus.NewDesc(
+			prometheus.BuildFQName(namespace, "", "calls_active"),
+			"Active calls deduplicated by Linkedid (one per logical call, regardless of leg count). Use this instead of asterisk_current_calls when 'one phone conversation' should map to '1'.",
+			nil, nil,
+		),
 
 		sipPeerUp: prometheus.NewDesc(
 			prometheus.BuildFQName(namespace, "sip", "peer_up"),
@@ -188,6 +194,7 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.currentCalls
 	ch <- c.channels
 	ch <- c.channelsByState
+	ch <- c.callsActive
 	ch <- c.sipPeerUp
 	ch <- c.sipPeerLatencyMs
 	ch <- c.sipPeerCount

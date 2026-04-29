@@ -79,9 +79,14 @@ func TestCollectorHappyPath(t *testing.T) {
 		},
 		lists: map[string][]ami.Message{
 			"CoreShowChannels": {
-				ami.NewMessage("Event", "CoreShowChannel", "Channel", "PJSIP/100-001", "ChannelStateDesc", "Up"),
-				ami.NewMessage("Event", "CoreShowChannel", "Channel", "PJSIP/101-002", "ChannelStateDesc", "Ringing"),
-				ami.NewMessage("Event", "CoreShowChannel", "Channel", "PJSIP/102-003", "ChannelStateDesc", "Up"),
+				// 100 ↔ 102 are bridged (one logical call); 101 is its
+				// own call. Two unique Linkedids → asterisk_calls_active=2.
+				ami.NewMessage("Event", "CoreShowChannel", "Channel", "PJSIP/100-001",
+					"ChannelStateDesc", "Up", "Linkedid", "L1", "Uniqueid", "U1"),
+				ami.NewMessage("Event", "CoreShowChannel", "Channel", "PJSIP/101-002",
+					"ChannelStateDesc", "Ringing", "Linkedid", "L2", "Uniqueid", "U2"),
+				ami.NewMessage("Event", "CoreShowChannel", "Channel", "PJSIP/102-003",
+					"ChannelStateDesc", "Up", "Linkedid", "L1", "Uniqueid", "U3"),
 			},
 			"SIPpeers": {
 				ami.NewMessage("Event", "PeerEntry", "ObjectName", "100", "Status", "OK (12 ms)"),
@@ -126,6 +131,9 @@ func TestCollectorHappyPath(t *testing.T) {
 	}
 
 	expected := strings.NewReader(`
+# HELP asterisk_calls_active Active calls deduplicated by Linkedid (one per logical call, regardless of leg count). Use this instead of asterisk_current_calls when 'one phone conversation' should map to '1'.
+# TYPE asterisk_calls_active gauge
+asterisk_calls_active 2
 # HELP asterisk_channels_active Number of currently active channels.
 # TYPE asterisk_channels_active gauge
 asterisk_channels_active 3
@@ -137,6 +145,7 @@ asterisk_current_calls 3
 asterisk_info{system_name="pbx-1",version="18.20.0"} 1
 `)
 	if err := testutil.CollectAndCompare(c, expected,
+		"asterisk_calls_active",
 		"asterisk_channels_active",
 		"asterisk_current_calls",
 		"asterisk_info",

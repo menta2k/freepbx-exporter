@@ -70,15 +70,28 @@ func (c *Collector) collectChannels(ctx context.Context, conn ami.Conn, ch chan<
 	)
 
 	byState := make(map[string]int, 8)
+	// Each unique Linkedid is one logical call, regardless of leg count
+	// (a 2-party PJSIP call has 2 channels but 1 Linkedid; a 3-way
+	// conference has 3 channels and still 1 Linkedid). Channels without
+	// a Linkedid (rare; pre-bridge originate dialplan code) fall back to
+	// Uniqueid so they aren't all collapsed into the empty bucket.
+	linkedids := make(map[string]struct{}, len(items))
 	for _, m := range items {
 		state := firstNonEmpty(m.Get("ChannelStateDesc"), m.Get("ChannelState"), "Unknown")
 		byState[state]++
+		id := firstNonEmpty(m.Get("Linkedid"), m.Get("Uniqueid"))
+		if id != "" {
+			linkedids[id] = struct{}{}
+		}
 	}
 	for state, n := range byState {
 		ch <- prometheus.MustNewConstMetric(
 			c.channelsByState, prometheus.GaugeValue, float64(n), state,
 		)
 	}
+	ch <- prometheus.MustNewConstMetric(
+		c.callsActive, prometheus.GaugeValue, float64(len(linkedids)),
+	)
 	return nil
 }
 

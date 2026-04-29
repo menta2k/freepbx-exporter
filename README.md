@@ -15,7 +15,8 @@ Written in Go, single binary, no external dependencies on the PBX host.
 | `asterisk_info` | gauge | `version`, `system_name` | Build info (always 1) |
 | `asterisk_uptime_seconds` | gauge | – | Seconds since `core start` |
 | `asterisk_last_reload_seconds` | gauge | – | Seconds since last reload |
-| `asterisk_current_calls` | gauge | – | `CoreStatus.CoreCurrentCalls` |
+| `asterisk_current_calls` | gauge | – | `CoreStatus.CoreCurrentCalls` — Asterisk's leg-based count (one PJSIP conversation usually reports as 2). Kept for compatibility; prefer `asterisk_calls_active` for dashboards |
+| `asterisk_calls_active` | gauge | – | Active calls deduplicated by `Linkedid` from `CoreShowChannels` — one per logical call regardless of leg count |
 | `asterisk_channels_active` | gauge | – | Channels currently allocated |
 | `asterisk_channels_by_state` | gauge | `state` | Channels grouped by `ChannelStateDesc` |
 | `asterisk_sip_peer_up` | gauge | `peer`, `status` | chan_sip peer reachability (1=OK) |
